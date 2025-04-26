@@ -5,13 +5,13 @@ import enums.ReasonEnum;
 
 public class AcknowledgementPacket extends Packet {
     private boolean positive;
-    private int receiveSequence; // p(r)
-    private ReasonEnum reason; // Pour les acquittements négatifs
+    private int receiveSequence;
+    private ReasonEnum reason;
     
     public AcknowledgementPacket(int connectionId, boolean positive, int receiveSequence) {
         super(connectionId, positive ? PacketTypeEnum.PositiveAck : PacketTypeEnum.NegativeAck);
         this.positive = positive;
-        this.receiveSequence = receiveSequence % 8; // Numérotation modulo 8
+        this.receiveSequence = receiveSequence % 8;
         this.reason = null;
     }
     
@@ -35,11 +35,7 @@ public class AcknowledgementPacket extends Packet {
     }
     
     public String getPacketType() {
-        // Pour acquittement positif: p(r)00001
-        // Pour acquittement négatif: p(r)01001
         String base = positive ? "00001" : "01001";
-        
-        // Ajouter p(r) sur 3 bits au début
         return String.format("%3s", Integer.toBinaryString(receiveSequence)).replace(' ', '0') + base;
     }
     
@@ -64,11 +60,7 @@ public class AcknowledgementPacket extends Packet {
         
         String typeStr = parts[0];
         int connectionId = Integer.parseInt(parts[1]);
-        
-        // Les 3 premiers bits sont p(r)
         int receiveSequence = Integer.parseInt(typeStr.substring(0, 3), 2);
-        
-        // Déterminer si c'est un acquittement positif ou négatif
         boolean positive = typeStr.endsWith("00001");
         
         if (positive) {

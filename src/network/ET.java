@@ -69,7 +69,6 @@ public class ET extends Thread {
             Connection connection = iterator.next();
             
             if (connection.getEtatConnexion() == ConnectionStateEnum.WAITING_CONFIRMATION) {
-                // Envoyer une demande de connexion à ER si ce n'est pas déjà fait
                 if (!connection.isProcessed()) {
                     sendConnectRequest(connection);
                     connection.setProcessed(true);
@@ -77,21 +76,18 @@ public class ET extends Thread {
                 }
             } 
             else if (connection.getEtatConnexion() == ConnectionStateEnum.ESTABLISHED) {
-                // Envoyer les données à ER si la connexion est établie
                 if (!connection.isDataSent()) {
                     sendDataRequest(connection);
                     connection.setDataSent(true);
                     anyChanges = true;
                 }
                 
-                // Libérer la connexion une fois les données envoyées
                 if (connection.isDataSent() && !connection.isReleaseRequested()) {
                     sendDisconnectRequest(connection);
                     connection.setReleaseRequested(true);
                     anyChanges = true;
                 }
                 
-                // Supprimer la connexion une fois complètement traitée
                 if (connection.isReleaseConfirmed()) {
                     log("Suppression de la connexion " + connection.getIdentifier() + " de la liste");
                     iterator.remove();
@@ -111,7 +107,11 @@ public class ET extends Thread {
     public static void writeToFile(String data) {
         fileLock.lock();
         try {
+            if (!data.endsWith("\n")) {
+                data = data + "\n";
+            }
             FileManager.appendToFile("S_erc", data);
+            System.out.println("[ET] Écrit dans S_erc: " + data.trim());
         } catch (Exception e) {
             System.err.println("Erreur lors de l'écriture dans le fichier : " + e.getMessage());
         } finally {
@@ -125,28 +125,19 @@ public class ET extends Thread {
     @Override
     public void run() {
         log("Démarrage de l'entité transport");
-        
-        // Démarrer les connexions
         for (Connection connection : connections) {
             connection.start();
         }
         
         displayConnections();
-        
-        // Ajouter un compteur de cycles sans changement pour détecter les blocages
         int unchangedCycles = 0;
         int previousSize = connections.size();
         
         // Boucle principale de traitement
-        while (!connections.isEmpty() && unchangedCycles < 20) {  // Ajout d'une condition de sortie
+        while (!connections.isEmpty() && unchangedCycles < 20) { 
             try {
-                // Traiter les primitives reçues de l'entité réseau
                 processPrimitives();
-                
-                // Mise à jour de l'état des connexions
                 update();
-                
-                // Vérifier si la taille de la liste de connexions a changé
                 if (connections.size() == previousSize) {
                     unchangedCycles++;
                     if (unchangedCycles % 5 == 0) {
@@ -165,8 +156,6 @@ public class ET extends Thread {
         
         if (unchangedCycles >= 20) {
             log("Détection de blocage possible. Arrêt forcé du traitement.");
-            
-            // Forcer la libération des connexions restantes
             Iterator<Connection> iterator = connections.iterator();
             while (iterator.hasNext()) {
                 Connection connection = iterator.next();
@@ -197,38 +186,41 @@ public class ET extends Thread {
      * Traitement des primitives reçues de l'entité réseau
      */
     private void processPrimitives() {
-        Primitive primitive = primitivesQueue.poll();
-        if (primitive == null) {
-            return;
-        }
-        
-        int connectionId = primitive.getIdentifier();
-        Connection connection = findConnectionById(connectionId);
-        
-        if (connection == null) {
-            log("Erreur: Connexion non trouvée pour ID:" + connectionId);
-            return;
-        }
-        
-        if (primitive instanceof ConnectPrimitive) {
-            // Confirmation d'établissement de connexion
-            log("Connexion établie pour ID:" + connectionId);
-            connection.setEtatConnexion(ConnectionStateEnum.ESTABLISHED);
-            writeToFile("Connexion " + connectionId + " établie");
-        } 
-        else if (primitive instanceof DisconnectPrimitive) {
-            // Indication de libération
-            DisconnectPrimitive disconnectPrim = (DisconnectPrimitive) primitive;
-            
-            if (disconnectPrim.getReason() == ReasonEnum.SUPPLIER_REJECTION) {
-                log("Connexion refusée par le fournisseur pour ID:" + connectionId);
-                writeToFile("Connexion " + connectionId + " refusée par le fournisseur");
-            } else {
-                log("Connexion refusée par le distant pour ID:" + connectionId);
-                writeToFile("Connexion " + connectionId + " refusée par le distant");
+        try {
+            Primitive primitive = primitivesQueue.poll();
+            if (primitive == null) {
+                return;
             }
             
-            connection.setReleaseConfirmed(true);
+            int connectionId = primitive.getIdentifier();
+            Connection connection = findConnectionById(connectionId);
+            
+            if (connection == null) {
+                log("Erreur: Connexion non trouvée pour ID:" + connectionId);
+                return;
+            }
+            
+            if (primitive instanceof ConnectPrimitive) {
+                log("Connexion établie pour ID:" + connectionId);
+                connection.setEtatConnexion(ConnectionStateEnum.ESTABLISHED);
+                writeToFile("Connexion " + connectionId + " établie");
+            } 
+            else if (primitive instanceof DisconnectPrimitive) {
+                DisconnectPrimitive disconnectPrim = (DisconnectPrimitive) primitive;
+                
+                if (disconnectPrim.getReason() == ReasonEnum.SUPPLIER_REJECTION) {
+                    log("Connexion refusée par le fournisseur pour ID:" + connectionId);
+                    writeToFile("Connexion " + connectionId + " refusée par le fournisseur");
+                } else {
+                    log("Connexion refusée par le distant pour ID:" + connectionId);
+                    writeToFile("Connexion " + connectionId + " refusée par le distant");
+                }
+                
+                connection.setReleaseConfirmed(true);
+            }
+        } catch (Exception e) {
+            System.err.println("[ET] Erreur dans processPrimitives: " + e.getMessage());
+            e.printStackTrace();
         }
     }
     

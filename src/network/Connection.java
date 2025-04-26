@@ -113,9 +113,7 @@ public class Connection extends Thread {
     @Override
     public void run() {
         try {
-            // Simuler le traitement de la connexion
-            Thread.sleep(2000); // Simule un délai de 2 secondes
-            // Nous ne changeons plus l'état ici, c'est ET qui le fait en fonction des réponses d'ER
+            Thread.sleep(2000);
         } catch (InterruptedException e) {
             System.err.println("Erreur lors du traitement de la connexion " + indentifier + ": " + e.getMessage());
         }
@@ -131,8 +129,9 @@ public class Connection extends Thread {
     /**
      * Définit l'état de la connexion.
      */
-    public void setEtatConnexion(ConnectionStateEnum etatConnexion) {
+    public synchronized void setEtatConnexion(ConnectionStateEnum etatConnexion) {
         this.etatConnexion = etatConnexion;
+        System.out.println("[CONNECTION] ID:" + indentifier + " - État changé à: " + etatConnexion);
     }
 
     /**

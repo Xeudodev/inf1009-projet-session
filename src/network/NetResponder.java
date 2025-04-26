@@ -93,17 +93,13 @@ public class NetResponder extends Thread {
             String destAddr = parts[3];
             String payload = parts.length > 4 ? parts[4] : "";
             
-            // Vérification des adresses
             String result = verifyRemote(connectionNumber, sourceAddr, destAddr);
-            
-            // Envoyer accusé de réception
             processAcknowledgement(result, connectionNumber, result.equals("ACK"));
             
             if (result.equals("ACK")) {
                 log("Données reçues pour connexion " + connectionNumber + ": " + payload);
             }
         } else {
-            // Traitement des paquets de contrôle (Call, Release, etc.)
             handleControlPacket(packetType, connectionNumber, parts);
         }
     }
@@ -113,7 +109,6 @@ public class NetResponder extends Thread {
      */
     private void handleControlPacket(String packetType, String connectionNumber, String[] parts) throws IOException {
         if (packetType.equals(PacketTypeEnum.Call.toString())) {
-            // Demande de connexion - répondre avec un ACK ou NACK aléatoire
             boolean acceptConnection = random.nextInt(10) > 2; // 80% de chances d'accepter
             
             if (acceptConnection) {
@@ -125,7 +120,6 @@ public class NetResponder extends Thread {
             }
         } 
         else if (packetType.equals(PacketTypeEnum.Release.toString())) {
-            // Demande de déconnexion - répondre avec un ACK
             processAcknowledgement("ACK", connectionNumber, true);
             log("Connexion " + connectionNumber + " terminée");
         }
@@ -154,8 +148,6 @@ public class NetResponder extends Thread {
      * Vérifie si le type de paquet est un paquet de données
      */
     private boolean isDataPacket(String type) {
-        // Le paquet de données a généralement un format différent des autres
-        // Adapté selon votre protocole de communication
         return !type.equals(PacketTypeEnum.Call.toString()) && 
                !type.equals(PacketTypeEnum.ConnectionEstablished.toString()) && 
                !type.equals(PacketTypeEnum.Release.toString()) && 
@@ -171,8 +163,6 @@ public class NetResponder extends Thread {
             int connId = Integer.parseInt(connectionNum);
             int srcAddr = Integer.parseInt(sourceAddr);
             int dstAddr = Integer.parseInt(destAddr);
-            
-            // Vérifier si la connexion existe dans la liste des connexions
             List<Connection> connections = ET.getConnections();
             for (Connection conn : connections) {
                 if (conn.getIdentifier() == connId && 

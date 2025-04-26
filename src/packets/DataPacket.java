@@ -10,7 +10,6 @@ public class DataPacket extends Packet {
     private static final int MAX_DATA_SIZE = 128; // 128 octets maximum
     
     public DataPacket(int identifier, String data, int sendSequence, int receiveSequence, boolean moreData) {
-        // Utiliser l'énumération pour le type
         super(identifier, PacketTypeEnum.Data);
         
         if (data.length() > MAX_DATA_SIZE) {
@@ -48,13 +47,12 @@ public class DataPacket extends Packet {
      */
     public String getBinaryType() {
         int typeValue = 0;
-        typeValue |= (receiveSequence & 0x7) << 4; // p(r) sur 3 bits
+        typeValue |= (receiveSequence & 0x7) << 4; // p(r) - 3 bits
         if (moreData) {
             typeValue |= 1 << 3; // Bit M
         }
-        typeValue |= (sendSequence & 0x7); // p(s) sur 3 bits
+        typeValue |= (sendSequence & 0x7); // p(s)- 3 bits
         
-        // Convertir en binaire sous forme de chaîne de 8 bits
         return String.format("%8s", Integer.toBinaryString(typeValue)).replace(' ', '0');
     }
     

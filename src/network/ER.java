@@ -1,7 +1,7 @@
 package network;
+import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Random;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -21,12 +21,12 @@ public class ER extends Thread {
     
     // Compteur pour générer les numéros de connexion réseau
     private int networkConnectionCounter = 0;
-    
-    // Générateur de nombres aléatoires
-    private Random random = new Random();
-    
+        
     // Flag d'arrêt du thread
     private boolean running = true;
+    
+    // Chemin du fichier de liaison
+    private static final String L_ECR_PATH = "L_ecr";
     
     /**
      * Classe interne pour stocker les informations d'une connexion réseau
@@ -63,16 +63,10 @@ public class ER extends Thread {
         
         while (running) {
             try {
-                // Traiter les primitives en attente
                 Primitive primitive = primitivesQueue.poll();
                 if (primitive != null) {
                     processPrimitive(primitive);
                 }
-                
-                // Vérifier les réponses de la couche liaison
-                checkLinkResponses();
-                
-                // Pause courte pour économiser les ressources CPU
                 sleep(50);
             } catch (InterruptedException e) {
                 if (running) {
@@ -114,20 +108,16 @@ public class ER extends Thread {
         int sourceAddr = ((ConnectPrimitive) primitive).getSourceAddress();
         int destAddr = ((ConnectPrimitive) primitive).getDestinationAddress();
         
-        // Déterminer si le fournisseur de service réseau accepte la connexion
         if (sourceAddr % 27 == 0) {
-            // Refus de connexion par le fournisseur
             log("Connexion refusée par le fournisseur pour ID:" + transportId + 
                 " (source:" + sourceAddr + ")");
             
-            // Envoyer la primitive N_DISCONNECT.ind à ET
             DisconnectPrimitive disconnectPrim = new DisconnectPrimitive(
                 transportId, 0, ReasonEnum.SUPPLIER_REJECTION);
             ET.receivePrimitive(disconnectPrim);
             return;
         }
         
-        // Création de la connexion réseau
         NetworkConnection connection = new NetworkConnection(transportId, sourceAddr, destAddr);
         connections.put(connection.networkConnectionId, connection);
         
@@ -135,60 +125,38 @@ public class ER extends Thread {
             ", Réseau ID:" + connection.networkConnectionId + 
             " (source:" + sourceAddr + ", dest:" + destAddr + ")");
         
-        // Création et envoi du paquet d'appel
         CallPacket callPacket = new CallPacket(
             connection.networkConnectionId, sourceAddr, destAddr);
-        
-        // Écrire dans le fichier de liaison
         writeToLink(callPacket.toString());
         
-        // Simuler la réponse du distant selon les règles de l'énoncé
         if (sourceAddr % 19 == 0) {
-            // Pas de réponse si la source est multiple de 19
             log("Aucune réponse reçue pour la connexion: " + connection.networkConnectionId);
             
-            // Envoyer la primitive N_DISCONNECT.ind à ET
             DisconnectPrimitive disconnectPrim = new DisconnectPrimitive(
                 transportId, 0, ReasonEnum.REMOTE_REJECTION);
             ET.receivePrimitive(disconnectPrim);
-            
-            // Supprimer la connexion
             connections.remove(connection.networkConnectionId);
         } 
         else if (sourceAddr % 13 == 0) {
-            // Refus de connexion si la source est multiple de 13
             log("Connexion refusée par le distant pour ID:" + connection.networkConnectionId);
             
-            // Simuler la réception d'un paquet de refus
             ReleasePacket releasePacket = new ReleasePacket(
                 connection.networkConnectionId, destAddr, sourceAddr, ReasonEnum.REMOTE_REJECTION);
             
-            // Écrire la réponse dans L_lec pour trace
             writeToLinkLog(releasePacket.toString());
             
-            // Envoyer la primitive N_DISCONNECT.ind à ET
             DisconnectPrimitive disconnectPrim = new DisconnectPrimitive(
                 transportId, 0, ReasonEnum.REMOTE_REJECTION);
             ET.receivePrimitive(disconnectPrim);
             
-            // Supprimer la connexion
             connections.remove(connection.networkConnectionId);
         } 
         else {
-            // Acceptation de la connexion dans les autres cas
             log("Connexion acceptée par le distant pour ID:" + connection.networkConnectionId);
-            
-            // Simuler la réception d'un paquet d'acceptation
             ConnectionEstablishedPacket establishedPacket = new ConnectionEstablishedPacket(
                 connection.networkConnectionId, destAddr, sourceAddr);
-            
-            // Écrire la réponse dans L_lec pour trace
             writeToLinkLog(establishedPacket.toString());
-            
-            // Mettre à jour l'état de la connexion
             connection.state = ConnectionStateEnum.ESTABLISHED;
-            
-            // Envoyer la primitive N_CONNECT.conf à ET
             ConnectPrimitive connectConf = new ConnectPrimitive(transportId, 0);
             ET.receivePrimitive(connectConf);
         }
@@ -201,12 +169,10 @@ public class ER extends Thread {
         int transportId = primitive.getIdentifier();
         String data = primitive.getData();
         
-        // Trouver la connexion associée à cet identifiant de transport
         NetworkConnection connection = findConnectionByTransportId(transportId);
         
         if (connection == null) {
             log("Erreur: Aucune connexion trouvée pour ID:" + transportId);
-            // DEBUG: Afficher toutes les connexions
             log("Connexions actives: " + connections.keySet());
             return;
         }
@@ -217,67 +183,17 @@ public class ER extends Thread {
             return;
         }
         
-        // Segmenter les données si nécessaire
         DataPacket[] packets = DataPacket.segmentData(
             connection.networkConnectionId, data, 0);
         
-        // Envoyer chaque paquet et attendre l'acquittement avant d'envoyer le suivant
-        for (int i = 0; i < packets.length; i++) {
-            DataPacket packet = packets[i];
-            
-            // Écrire dans le fichier de liaison
+        for (DataPacket packet : packets) {
             writeToLink(packet.toString());
             
-            // Simuler la réponse selon les règles de l'énoncé
-            if (connection.sourceAddress % 15 == 0) {
-                // Pas d'acquittement si la source est multiple de 15
-                log("Aucun acquittement reçu pour le paquet " + i + " de la connexion " + 
-                    connection.networkConnectionId);
-                
-                // Réémission du paquet (une seule tentative)
-                log("Réémission du paquet " + i);
-                writeToLink(packet.toString());
-                
-                // Si toujours pas d'acquittement, on continue avec le paquet suivant
-            } 
-            else {
-                // Tirage aléatoire pour déterminer si l'acquittement est positif ou négatif
-                int randomSeq = random.nextInt(8);
-                
-                if (packet.getSendSequence() == randomSeq) {
-                    // Acquittement négatif
-                    log("Acquittement négatif reçu pour le paquet " + i + " de la connexion " + 
-                        connection.networkConnectionId);
-                    
-                    // Simuler la réception d'un acquittement négatif
-                    AcknowledgementPacket nackPacket = new AcknowledgementPacket(
-                        connection.networkConnectionId, false, (packet.getSendSequence() + 1) % 8);
-                    
-                    // Écrire la réponse dans L_lec pour trace
-                    writeToLinkLog(nackPacket.toString());
-                    
-                    // Réémission du paquet (une seule tentative)
-                    log("Réémission du paquet " + i);
-                    writeToLink(packet.toString());
-                    
-                    // Simuler un acquittement positif pour la réémission
-                    AcknowledgementPacket ackPacket = new AcknowledgementPacket(
-                        connection.networkConnectionId, true, (packet.getSendSequence() + 1) % 8);
-                    writeToLinkLog(ackPacket.toString());
-                } 
-                else {
-                    // Acquittement positif
-                    log("Acquittement positif reçu pour le paquet " + i + " de la connexion " + 
-                        connection.networkConnectionId);
-                    
-                    // Simuler la réception d'un acquittement positif
-                    AcknowledgementPacket ackPacket = new AcknowledgementPacket(
-                        connection.networkConnectionId, true, (packet.getSendSequence() + 1) % 8);
-                    
-                    // Écrire la réponse dans L_lec pour trace
-                    writeToLinkLog(ackPacket.toString());
-                }
-            }
+            log("Aucun acquittement reçu pour le paquet " + packet.getSendSequence() + 
+                " de la connexion " + connection.networkConnectionId);
+            log("Réémission du paquet " + packet.getSendSequence());
+            
+            writeToLink(packet.toString());
         }
         
         log("Transfert de données terminé pour ID:" + transportId);
@@ -289,49 +205,40 @@ public class ER extends Thread {
     private void processDisconnectRequest(DisconnectPrimitive primitive) {
         int transportId = primitive.getIdentifier();
         
-        // Trouver la connexion associée à cet identifiant de transport
         NetworkConnection connection = findConnectionByTransportId(transportId);
         
         if (connection == null) {
             log("Erreur: Aucune connexion trouvée pour ID:" + transportId);
             return;
         }
-        
-        // Création et envoi du paquet de libération
-        ReleasePacket releasePacket = new ReleasePacket(
-            connection.networkConnectionId, connection.sourceAddress, connection.destinationAddress);
-        
-        // Écrire dans le fichier de liaison
+        ReleasePacket releasePacket = new ReleasePacket(connection.networkConnectionId, connection.sourceAddress, connection.destinationAddress);
         writeToLink(releasePacket.toString());
-        
-        log("Connexion libérée: Transport ID:" + transportId + 
-            ", Réseau ID:" + connection.networkConnectionId);
-        
-        // Supprimer la connexion
+        log("Connexion libérée: Transport ID:" + transportId + ", Réseau ID:" + connection.networkConnectionId);
         connections.remove(connection.networkConnectionId);
     }
-    
-    /**
-     * Vérification des réponses de la couche liaison
-     */
-    private void checkLinkResponses() {
-        // Dans notre simulation, les réponses sont générées et traitées directement
-        // dans les méthodes de traitement des primitives
-    }
-    
+        
     /**
      * Écriture dans le fichier de liaison
      */
     private void writeToLink(String data) {
-        FileManager.appendToFile("L_ecr", data);
-        log("Écriture dans L_ecr: " + data);
+        try {
+            File f = new File(L_ECR_PATH);
+            if (!f.exists()) {
+                f.createNewFile();
+            }
+            
+            FileManager.appendToFile(f.getAbsolutePath(), data);
+            log("Écriture dans L_ecr: " + data.trim());
+        } catch (Exception e) {
+            System.err.println("CRITICAL ERROR: Failed to write to L_ecr: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
     
     /**
      * Écriture dans le fichier de log de liaison (pour tracer les réponses simulées)
      */
     private void writeToLinkLog(String data) {
-        // Assurer l'utilisation du bon nom de fichier
         FileManager.appendToFile("L_lec", data);
         log("Simulation réponse dans L_lec: " + data);
     }

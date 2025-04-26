@@ -65,20 +65,16 @@ public class LinkServiceTest {
         er = new ER();
         er.start();
         
-        // Envoi d'une demande de connexion
         ConnectPrimitive connectPrimitive = new ConnectPrimitive(1, 60, 50);
         er.receivePrimitive(connectPrimitive);
         
-        // Attendre que ER traite la demande
         Thread.sleep(1000);
         
-        // Vérifier le contenu du fichier L_ecr
         String content = new String(Files.readAllBytes(Paths.get(L_ECR_PATH)));
         System.out.println("Contenu de L_ecr: " + content);
         
-        // Vérifier qu'un paquet d'appel a été écrit
         assertTrue("ER devrait écrire un paquet d'appel dans L_ecr", 
-                content.contains("00001011"));  // Code du paquet d'appel
+                content.contains("00001011"));
         
         assertTrue("Le paquet d'appel devrait contenir l'adresse source", 
                 content.contains("60"));
@@ -95,29 +91,23 @@ public class LinkServiceTest {
         er = new ER();
         er.start();
         
-        // Établir une connexion
         ConnectPrimitive connectPrimitive = new ConnectPrimitive(1, 60, 50);
         er.receivePrimitive(connectPrimitive);
         Thread.sleep(1000);
         
-        // Simuler une réponse positive dans L_lec
-        String response = "00001111|0|50|60"; // Paquet de confirmation de connexion
+        String response = "00001111|0|50|60";
         FileManager.appendToFile(L_LEC_PATH, response);
         Thread.sleep(500);
         
-        // Envoyer des données
         String testData = "Test data for link service";
         DataPrimitive dataPrimitive = new DataPrimitive(1, testData);
         er.receivePrimitive(dataPrimitive);
         
-        // Attendre que ER traite la demande
         Thread.sleep(1000);
         
-        // Vérifier le contenu du fichier L_ecr
         String content = new String(Files.readAllBytes(Paths.get(L_ECR_PATH)));
         System.out.println("Contenu de L_ecr: " + content);
         
-        // Vérifier qu'un paquet de données a été écrit
         assertTrue("ER devrait écrire les données dans L_ecr", 
                 content.contains(testData));
     }
@@ -131,32 +121,25 @@ public class LinkServiceTest {
         et = new ET(er);
         er.start();
         
-        // Établir une connexion avec une source multiple de 15 (qui ne recevra pas d'acquittement)
         ConnectPrimitive connectPrimitive = new ConnectPrimitive(1, 60, 50);
         er.receivePrimitive(connectPrimitive);
         Thread.sleep(1000);
         
-        // Simuler une réponse positive dans L_lec
-        String response = "00001111|0|50|60"; // Paquet de confirmation de connexion
+        String response = "00001111|0|50|60";
         FileManager.appendToFile(L_LEC_PATH, response);
         Thread.sleep(500);
         
-        // Envoyer des données
         String testData = "Test data that will require retransmission";
         DataPrimitive dataPrimitive = new DataPrimitive(1, testData);
         er.receivePrimitive(dataPrimitive);
         
-        // Attendre assez longtemps pour que la retransmission se produise
         Thread.sleep(2000);
         
-        // Vérifier le contenu du fichier L_ecr
         String content = new String(Files.readAllBytes(Paths.get(L_ECR_PATH)));
         System.out.println("Contenu de L_ecr: " + content);
         
-        // Compter le nombre d'occurrences du message de données
         int occurrences = countOccurrences(content, testData);
         
-        // Vérifier que le message apparaît au moins 2 fois (1 envoi + au moins 1 retransmission)
         assertTrue("ER devrait retransmettre le paquet en l'absence d'acquittement (trouvé " + 
                 occurrences + " occurrences)", occurrences >= 2);
     }
@@ -166,33 +149,23 @@ public class LinkServiceTest {
      */
     @Test
     public void testRetransmissionOnNegativeAck() throws Exception {
-        // Ce test est plus complexe car il nécessite de simuler un acquittement négatif
-        // en réponse à un paquet de données spécifique. Pour simplifier, nous pouvons
-        // nous appuyer sur la simulation existante dans ER.
-        
         er = new ER();
         er.start();
         
-        // Établir une connexion
         ConnectPrimitive connectPrimitive = new ConnectPrimitive(1, 60, 50);
         er.receivePrimitive(connectPrimitive);
         Thread.sleep(1000);
         
-        // Simuler une réponse positive dans L_lec
-        String response = "00001111|0|50|60"; // Paquet de confirmation de connexion
+        String response = "00001111|0|50|60";
         FileManager.appendToFile(L_LEC_PATH, response);
         Thread.sleep(500);
         
-        // Envoyer des données et observer la réaction de ER
         String testData = "Test data for negative acknowledgement";
         DataPrimitive dataPrimitive = new DataPrimitive(1, testData);
         er.receivePrimitive(dataPrimitive);
         
-        // Attendre assez longtemps pour que le traitement et les retransmissions se produisent
         Thread.sleep(2000);
         
-        // Vérifier les journaux pour les messages de retransmission
-        // On considère le test réussi si ER a écrit dans le fichier L_ecr
         String content = new String(Files.readAllBytes(Paths.get(L_ECR_PATH)));
         assertTrue("ER devrait traiter la demande de données", 
                 !content.isEmpty() && content.contains(testData));
@@ -206,30 +179,24 @@ public class LinkServiceTest {
         er = new ER();
         er.start();
         
-        // Établir une connexion
         ConnectPrimitive connectPrimitive = new ConnectPrimitive(1, 60, 50);
         er.receivePrimitive(connectPrimitive);
         Thread.sleep(1000);
         
-        // Simuler une réponse positive dans L_lec
-        String response = "00001111|0|50|60"; // Paquet de confirmation de connexion
+        String response = "00001111|0|50|60";
         FileManager.appendToFile(L_LEC_PATH, response);
         Thread.sleep(500);
         
-        // Envoyer une demande de libération
         DisconnectPrimitive disconnectPrimitive = new DisconnectPrimitive(1, 0);
         er.receivePrimitive(disconnectPrimitive);
         
-        // Attendre que ER traite la demande
         Thread.sleep(1000);
         
-        // Vérifier le contenu du fichier L_ecr
         String content = new String(Files.readAllBytes(Paths.get(L_ECR_PATH)));
         System.out.println("Contenu de L_ecr: " + content);
         
-        // Vérifier qu'un paquet de libération a été écrit
         assertTrue("ER devrait écrire un paquet de libération dans L_ecr", 
-                content.contains("00010011"));  // Code du paquet de libération
+                content.contains("00010011"));
     }
     
     // Méthodes utilitaires
@@ -269,7 +236,6 @@ public class LinkServiceTest {
             connectionsField.setAccessible(true);
             ((List<?>) connectionsField.get(null)).clear();
         } catch (Exception e) {
-            // Ignorer les erreurs, c'est juste un nettoyage préventif
         }
         
         GlobalContext.resetConnectionIdCounter();

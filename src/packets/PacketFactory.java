@@ -24,7 +24,6 @@ public class PacketFactory {
         
         String typeStr = parts[0];
         
-        // Déterminer le type de paquet
         if (typeStr.equals(PacketTypeEnum.Call.toString())) {
             return CallPacket.fromString(packetString);
         } else if (typeStr.equals(PacketTypeEnum.ConnectionEstablished.toString())) {
@@ -35,7 +34,6 @@ public class PacketFactory {
                   typeStr.equals(PacketTypeEnum.NegativeAck.toString())) {
             return AcknowledgementPacket.fromString(packetString);
         } else {
-            // Par défaut, on suppose que c'est un paquet de données
             return DataPacket.fromString(packetString);
         }
     }

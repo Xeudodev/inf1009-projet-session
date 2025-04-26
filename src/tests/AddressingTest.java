@@ -66,25 +66,19 @@ public class AddressingTest {
         er = new ER();
         er.start();
         
-        // Utiliser une adresse source multiple de 27
-        int sourceAddress = 27 * 2; // 54
+        int sourceAddress = 27 * 2;
         ConnectPrimitive connectPrimitive = new ConnectPrimitive(1, sourceAddress, 50);
         er.receivePrimitive(connectPrimitive);
         
         Thread.sleep(1000);
         
-        // Vérifier directement les logs d'ER dans la console
-        // ou vérifier le contenu de L_ecr
         try {
             String errorMessage = "Connexion refusée par le fournisseur pour ID:1 (source:54)";
             System.out.println("Message attendu dans les logs: " + errorMessage);
             
-            // Alternative: Vérifier si ER a écrit quelque chose dans L_ecr
             String l_ecrContent = new String(Files.readAllBytes(Paths.get(L_ECR_PATH)));
             System.out.println("Contenu de L_ecr: " + l_ecrContent);
             
-            // Test passe si les logs montrent le rejet par le fournisseur
-            // Note: Ce n'est pas l'idéal mais c'est une solution de contournement
             assertTrue(true);
         } finally {
             er.shutdown();
@@ -101,16 +95,13 @@ public class AddressingTest {
         et = new ET(er);
         er.start();
         
-        // Initialiser ET avec un contenu personnalisé
         String testData = "Test for remote rejection";
         FileManager.writeToFile(S_LEC_PATH, testData);
         
-        // IMPORTANT: Forcer stationIter AVANT d'initialiser la connexion
         Field stationIterField = Connection.class.getDeclaredField("stationIter");
         stationIterField.setAccessible(true);
-        stationIterField.set(null, 2); // À l'itération 2, la source est 13
-        
-        // Maintenant initialiser ET et le démarrer
+        stationIterField.set(null, 2); 
+
         et.init();
         et.start();
         
@@ -140,15 +131,13 @@ public class AddressingTest {
         et = new ET(er);
         er.start();
         
-        // Initialiser ET avec un contenu personnalisé
         String testData = "Test for valid connection";
         FileManager.writeToFile(S_LEC_PATH, testData);
         et.init();
         
-        // Forcer l'utilisation d'une adresse source qui n'est pas multiple de 13, 19 ou 27
         Field stationIterField = Connection.class.getDeclaredField("stationIter");
         stationIterField.setAccessible(true);
-        stationIterField.set(null, 0); // À l'itération 0, la source est 60
+        stationIterField.set(null, 0); 
         
         et.start();
         Thread.sleep(2000);
@@ -157,7 +146,6 @@ public class AddressingTest {
             String content = new String(Files.readAllBytes(Paths.get(S_ERC_PATH)));
             System.out.println("Contenu de S_erc: " + content);
             
-            // Vérifier que la connexion a été établie
             assertTrue("La connexion avec source=60 devrait être établie",
                        content.contains("établie"));
         } catch (IOException e) {
@@ -200,7 +188,7 @@ public class AddressingTest {
             stationIterField.setAccessible(true);
             stationIterField.set(null, 0);
         } catch (Exception e) {
-            // Ignorer les erreurs, c'est juste un nettoyage préventif
+            e.printStackTrace();
         }
         
         GlobalContext.resetConnectionIdCounter();

@@ -30,12 +30,10 @@ public class InterfaceLayersTest {
     
     @Before
     public void setUp() {
-        // Nettoyage agressif avant chaque test
         resetStaticState();
         cleanupFiles();
         
         try {
-            // Pause pour garantir que tous les threads précédents sont bien arrêtés
             Thread.sleep(500);
         } catch (InterruptedException e) {}
         
@@ -50,27 +48,47 @@ public class InterfaceLayersTest {
     
     @After
     public void tearDown() {
-        // Arrêter ET proprement
         if (et != null && et.isAlive()) {
             et.interrupt();
             try {
-                et.join(1000);
-            } catch (InterruptedException e) {}
+                et.join(2000);
+                
+                if (et.isAlive()) {
+                    System.err.println("ATTENTION: ET ne s'est pas arrêté proprement, forçage...");
+                    et.stop();
+                }
+            } catch (InterruptedException e) {
+                System.err.println("Erreur lors de l'arrêt de ET: " + e.getMessage());
+            }
         }
         
-        // Arrêter ER proprement
         if (er != null) {
             er.shutdown();
             try {
-                er.join(1000);
-            } catch (InterruptedException e) {}
+                er.join(2000);
+                
+                if (er.isAlive()) {
+                    System.err.println("ATTENTION: ER ne s'est pas arrêté proprement, forçage...");
+                    er.interrupt();
+                    
+                    er.join(1000);
+                    
+                    if (er.isAlive()) {
+                        er.stop();
+                    }
+                }
+            } catch (InterruptedException e) {
+                System.err.println("Erreur lors de l'arrêt de ER: " + e.getMessage());
+            }
         }
         
-        // S'assurer que tous les fichiers sont nettoyés
         cleanupFiles();
         
-        // Réinitialiser l'état statique
         resetStaticState();
+        
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {}
     }
     
     /**
@@ -78,7 +96,6 @@ public class InterfaceLayersTest {
      */
     @Test
     public void testETtoERConnectPrimitive() throws InterruptedException {
-        // Utiliser un ID unique pour ce test (différent de celui de testERtoETConnectConfirmation)
         int uniqueTransportId = 99;
         
         er.start();
@@ -97,16 +114,14 @@ public class InterfaceLayersTest {
             fail("Erreur lors de la lecture du fichier L_ecr: " + e.getMessage());
         } finally {
             er.shutdown();
-            er.join(2000); // Augmenter le temps d'attente
+            er.join(2000);
             
-            // Force la terminaison si le thread ne s'arrête pas
             if (er.isAlive()) {
                 System.err.println("ER n'a pas pu être arrêté proprement, interruption forcée");
                 er.interrupt();
             }
         }
         
-        // Pause supplémentaire après le test
         Thread.sleep(500);
     }
     
@@ -115,10 +130,8 @@ public class InterfaceLayersTest {
      */
     @Test
     public void testERtoETConnectConfirmation() throws InterruptedException {
-        // Force l'attente pour s'assurer que le test précédent est bien terminé
         Thread.sleep(1000);
         
-        // Recréer des instances fraîches pour ce test
         er = new ER();
         et = new ET(er);
         
@@ -152,7 +165,6 @@ public class InterfaceLayersTest {
                 er.join(2000);
             } catch (InterruptedException e) {}
             
-            // Force la terminaison si les threads ne s'arrêtent pas
             if (er.isAlive() || (et != null && et.isAlive())) {
                 System.err.println("Certains threads n'ont pas pu être arrêtés proprement");
                 if (er.isAlive()) er.interrupt();
@@ -160,7 +172,6 @@ public class InterfaceLayersTest {
             }
         }
         
-        // Pause supplémentaire après le test
         Thread.sleep(500);
     }
     
@@ -169,32 +180,25 @@ public class InterfaceLayersTest {
      */
     @Test
     public void testFullCommunicationCycle() throws Exception {
-        // Préparer un environnement propre
         cleanupFiles();
         GlobalContext.initializeFiles();
         resetStaticState();
         
-        // Une pause pour s'assurer que tout est nettoyé
         Thread.sleep(1000);
         
-        // Créer de nouvelles instances
         er = new ER();
         et = new ET(er);
 
-        // Mettre un identifiant unique dans le contenu du fichier S_lec
         String uniqueMarker = "Connection_" + System.currentTimeMillis();
         FileManager.writeToFile(S_LEC_PATH, uniqueMarker);
         
         try {
-            // Démarrer les threads
             er.start();
             et.init();
             et.start();
             
-            // Attendre le temps nécessaire pour que la communication se produise
             Thread.sleep(3000);
             
-            // Vérifier le contenu des fichiers
             String l_ecrContent = new String(Files.readAllBytes(Paths.get(L_ECR_PATH)));
             System.out.println("Contenu de L_ecr: " + l_ecrContent);
             
@@ -211,7 +215,6 @@ public class InterfaceLayersTest {
             assertTrue("ET et ER devraient avoir communiqué sur l'état de la connexion", 
                     connectionProcessed);
         } finally {
-            // Arrêter proprement les threads
             if (et != null && et.isAlive()) {
                 et.interrupt();
                 et.join(1000);
@@ -222,12 +225,10 @@ public class InterfaceLayersTest {
                 er.join(1000);
             }
             
-            // Nettoyage final
             cleanupFiles();
             resetStaticState();
         }
         
-        // Une dernière pause pour s'assurer que tout est bien terminé
         Thread.sleep(500);
     }
     
@@ -297,7 +298,6 @@ public class InterfaceLayersTest {
      * Réinitialise l'état statique qui pourrait affecter d'autres tests
      */
     private void resetStaticState() {
-        // Vider les files d'attente statiques dans ET
         try {
             Field queueField = ET.class.getDeclaredField("primitivesQueue");
             queueField.setAccessible(true);
@@ -307,10 +307,8 @@ public class InterfaceLayersTest {
             connectionsField.setAccessible(true);
             ((List<?>) connectionsField.get(null)).clear();
         } catch (Exception e) {
-            // Ignorer les erreurs, c'est juste un nettoyage préventif
         }
         
-        // Réinitialiser les compteurs d'ID si nécessaire
         GlobalContext.resetConnectionIdCounter();
     }
 }

@@ -71,6 +71,7 @@ public class FileManager {
     public static void writeToFile(String fileName, String content) {
         try (FileWriter writer = new FileWriter(fileName, false)) {
             writer.write(content);
+            writer.flush(); // Forcer l'écriture immédiate
         } catch (IOException e) {
             System.err.println("Erreur lors de l'écriture dans le fichier " + fileName + " : " + e.getMessage());
         }
@@ -84,7 +85,8 @@ public class FileManager {
     public static void appendToFile(String fileName, String content) {
         try (FileWriter writer = new FileWriter(fileName, true)) {
             writer.write(content);
-            writer.write(System.lineSeparator()); 
+            writer.write(System.lineSeparator()); // Ajout d'un saut de ligne
+            writer.flush(); // Forcer l'écriture immédiate
         } catch (IOException e) {
             System.err.println("Erreur lors de l'ajout au fichier " + fileName + " : " + e.getMessage());
         }
