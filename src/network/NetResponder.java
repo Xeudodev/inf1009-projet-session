@@ -10,7 +10,7 @@ import enums.ReasonEnum;
 
 public class NetResponder extends Thread {
 
-    private static final String LINK_INPUT_FILE = "L_ec";
+    private static final String LINK_INPUT_FILE = "L_lec"; // Était probablement "L_ec"
     private static final String LINK_OUTPUT_FILE = "L_ecr";
     
     private long lastReadPosition = 0;

@@ -1,7 +1,5 @@
 package network;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.BlockingQueue;
@@ -206,8 +204,16 @@ public class ER extends Thread {
         // Trouver la connexion associée à cet identifiant de transport
         NetworkConnection connection = findConnectionByTransportId(transportId);
         
-        if (connection == null || connection.state != ConnectionStateEnum.ESTABLISHED) {
-            log("Erreur: Aucune connexion établie trouvée pour ID:" + transportId);
+        if (connection == null) {
+            log("Erreur: Aucune connexion trouvée pour ID:" + transportId);
+            // DEBUG: Afficher toutes les connexions
+            log("Connexions actives: " + connections.keySet());
+            return;
+        }
+        
+        if (connection.state != ConnectionStateEnum.ESTABLISHED) {
+            log("Erreur: La connexion n'est pas établie pour ID:" + transportId + 
+                ", état actuel: " + connection.state);
             return;
         }
         
@@ -325,6 +331,7 @@ public class ER extends Thread {
      * Écriture dans le fichier de log de liaison (pour tracer les réponses simulées)
      */
     private void writeToLinkLog(String data) {
+        // Assurer l'utilisation du bon nom de fichier
         FileManager.appendToFile("L_lec", data);
         log("Simulation réponse dans L_lec: " + data);
     }
