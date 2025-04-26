@@ -18,7 +18,7 @@ import java.nio.file.Paths;
 public class FileInitializationTest {
     
     private static final String S_LEC_PATH = "S_lec";
-    private static final String S_ECR_PATH = "S_ecr";
+    private static final String S_ERC_PATH = "S_erc";
     private static final String L_LEC_PATH = "L_lec";
     private static final String L_ECR_PATH = "L_ecr";
     
@@ -36,7 +36,7 @@ public class FileInitializationTest {
     @Test
     public void testFilesExist() {
         assertTrue("Le fichier S_lec n'existe pas", new File(S_LEC_PATH).exists());
-        assertTrue("Le fichier S_ecr n'existe pas", new File(S_ECR_PATH).exists());
+        assertTrue("Le fichier S_erc n'existe pas", new File(S_ERC_PATH).exists());
         assertTrue("Le fichier L_lec n'existe pas", new File(L_LEC_PATH).exists());
         assertTrue("Le fichier L_ecr n'existe pas", new File(L_ECR_PATH).exists());
     }
@@ -49,22 +49,22 @@ public class FileInitializationTest {
     
     @Test
     public void testEmptyOutputFiles() throws IOException {
-        String sEcrContent = new String(Files.readAllBytes(Paths.get(S_ECR_PATH)));
+        String sErcContent = new String(Files.readAllBytes(Paths.get(S_ERC_PATH)));  
         String lEcrContent = new String(Files.readAllBytes(Paths.get(L_ECR_PATH)));
         String lLecContent = new String(Files.readAllBytes(Paths.get(L_LEC_PATH)));
         
-        assertTrue("S_ecr devrait être vide initialement", sEcrContent.isEmpty());
+        assertTrue("S_erc devrait être vide initialement", sErcContent.isEmpty());  
         assertTrue("L_ecr devrait être vide initialement", lEcrContent.isEmpty());
         assertTrue("L_lec devrait être vide initialement", lLecContent.isEmpty());
     }
     
     @Test
-    public void testWriteToS_ecr() throws IOException {
+    public void testWriteToS_erc() throws IOException {
         String testMessage = "Test message";
         ET.writeToFile(testMessage);
         
-        String content = new String(Files.readAllBytes(Paths.get(S_ECR_PATH)));
-        assertTrue("Le message devrait être écrit dans S_ecr", content.contains(testMessage));
+        String content = new String(Files.readAllBytes(Paths.get(S_ERC_PATH)));  
+        assertTrue("Le message devrait être écrit dans S_erc", content.contains(testMessage));  
     }
     
     @Test
@@ -78,7 +78,7 @@ public class FileInitializationTest {
     
     private void cleanupFiles() {
         deleteFile(S_LEC_PATH);
-        deleteFile(S_ECR_PATH);
+        deleteFile(S_ERC_PATH);  
         deleteFile(L_LEC_PATH);
         deleteFile(L_ECR_PATH);
     }

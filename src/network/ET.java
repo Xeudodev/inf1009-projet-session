@@ -106,12 +106,12 @@ public class ET extends Thread {
     }
 
     /**
-     * Écriture dans le fichier de log S_ecr
+     * Écriture dans le fichier de log S_erc
      */
     public static void writeToFile(String data) {
         fileLock.lock();
         try {
-            FileManager.appendToFile("S_ecr", data);
+            FileManager.appendToFile("S_erc", data);
         } catch (Exception e) {
             System.err.println("Erreur lors de l'écriture dans le fichier : " + e.getMessage());
         } finally {

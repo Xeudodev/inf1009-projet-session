@@ -27,7 +27,7 @@ public class NetResponder extends Thread {
     }
     
     /**
-     * Enregistre un message dans le fichier de log S_ecr
+     * Enregistre un message dans le fichier de log S_erc
      * @param message Le message à enregistrer
      */
     private void log(String message) {

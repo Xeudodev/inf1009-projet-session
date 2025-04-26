@@ -15,7 +15,7 @@ public class GlobalContext {
     /**
      * Liste des fichiers utilisés par l'application.
      */
-    public static final String[] FILES = {"S_lec", "S_ecr", "L_lec", "L_ecr"};
+    public static final String[] FILES = {"S_lec", "S_erc", "L_lec", "L_ecr"};
 
     /**
      * Délai d'attente par défaut pour les connexions (en millisecondes).
