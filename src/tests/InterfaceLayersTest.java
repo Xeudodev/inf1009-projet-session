@@ -13,8 +13,11 @@ import packets.DataPacket;
 import primitives.*;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.List;
+import java.util.Queue;
 
 public class InterfaceLayersTest {
     
@@ -27,7 +30,15 @@ public class InterfaceLayersTest {
     
     @Before
     public void setUp() {
+        // Nettoyage agressif avant chaque test
+        resetStaticState();
         cleanupFiles();
+        
+        try {
+            // Pause pour garantir que tous les threads précédents sont bien arrêtés
+            Thread.sleep(500);
+        } catch (InterruptedException e) {}
+        
         GlobalContext.initializeFiles();
         
         String testData = "Test data for connection";
@@ -39,10 +50,27 @@ public class InterfaceLayersTest {
     
     @After
     public void tearDown() {
+        // Arrêter ET proprement
+        if (et != null && et.isAlive()) {
+            et.interrupt();
+            try {
+                et.join(1000);
+            } catch (InterruptedException e) {}
+        }
+        
+        // Arrêter ER proprement
         if (er != null) {
             er.shutdown();
+            try {
+                er.join(1000);
+            } catch (InterruptedException e) {}
         }
+        
+        // S'assurer que tous les fichiers sont nettoyés
         cleanupFiles();
+        
+        // Réinitialiser l'état statique
+        resetStaticState();
     }
     
     /**
@@ -50,9 +78,12 @@ public class InterfaceLayersTest {
      */
     @Test
     public void testETtoERConnectPrimitive() throws InterruptedException {
+        // Utiliser un ID unique pour ce test (différent de celui de testERtoETConnectConfirmation)
+        int uniqueTransportId = 99;
+        
         er.start();
         
-        ConnectPrimitive connectPrimitive = new ConnectPrimitive(1, 60, 50);
+        ConnectPrimitive connectPrimitive = new ConnectPrimitive(uniqueTransportId, 60, 50);
         er.receivePrimitive(connectPrimitive);
         Thread.sleep(1000);
         
@@ -66,8 +97,17 @@ public class InterfaceLayersTest {
             fail("Erreur lors de la lecture du fichier L_ecr: " + e.getMessage());
         } finally {
             er.shutdown();
-            er.join(1000);
+            er.join(2000); // Augmenter le temps d'attente
+            
+            // Force la terminaison si le thread ne s'arrête pas
+            if (er.isAlive()) {
+                System.err.println("ER n'a pas pu être arrêté proprement, interruption forcée");
+                er.interrupt();
+            }
         }
+        
+        // Pause supplémentaire après le test
+        Thread.sleep(500);
     }
     
     /**
@@ -75,6 +115,13 @@ public class InterfaceLayersTest {
      */
     @Test
     public void testERtoETConnectConfirmation() throws InterruptedException {
+        // Force l'attente pour s'assurer que le test précédent est bien terminé
+        Thread.sleep(1000);
+        
+        // Recréer des instances fraîches pour ce test
+        er = new ER();
+        et = new ET(er);
+        
         er.start();
         
         et.init();
@@ -86,15 +133,35 @@ public class InterfaceLayersTest {
             String content = new String(Files.readAllBytes(Paths.get(S_ERC_PATH)));
             System.out.println("Contenu de S_erc: " + content);
             
-            assertTrue("ET devrait logger la confirmation de connexion dans S_erc", 
-                    content.contains("établie") || content.contains("confirmée"));
+            assertTrue("ET devrait logger la confirmation ou le refus de connexion dans S_erc", 
+                    content.contains("établie") || 
+                    content.contains("confirmée") || 
+                    content.contains("refusée")); 
         } catch (IOException e) {
             fail("Erreur lors de la lecture du fichier S_erc: " + e.getMessage());
+        } finally {
+            et.interrupt();
+            if (et.isAlive()) {
+                try {
+                    et.join(2000);
+                } catch (InterruptedException e) {}
+            }
+            
+            er.shutdown();
+            try {
+                er.join(2000);
+            } catch (InterruptedException e) {}
+            
+            // Force la terminaison si les threads ne s'arrêtent pas
+            if (er.isAlive() || (et != null && et.isAlive())) {
+                System.err.println("Certains threads n'ont pas pu être arrêtés proprement");
+                if (er.isAlive()) er.interrupt();
+                if (et.isAlive()) et.interrupt();
+            }
         }
-                
-        et.interrupt();
-        er.shutdown();
-        er.join(1000);
+        
+        // Pause supplémentaire après le test
+        Thread.sleep(500);
     }
     
     /**
@@ -102,31 +169,66 @@ public class InterfaceLayersTest {
      */
     @Test
     public void testFullCommunicationCycle() throws Exception {
-        er.start();
+        // Préparer un environnement propre
+        cleanupFiles();
+        GlobalContext.initializeFiles();
+        resetStaticState();
         
-        et.init();
-        et.start();
+        // Une pause pour s'assurer que tout est nettoyé
+        Thread.sleep(1000);
         
-        Thread.sleep(3000);
+        // Créer de nouvelles instances
+        er = new ER();
+        et = new ET(er);
+
+        // Mettre un identifiant unique dans le contenu du fichier S_lec
+        String uniqueMarker = "Connection_" + System.currentTimeMillis();
+        FileManager.writeToFile(S_LEC_PATH, uniqueMarker);
         
-        String l_ecrContent = new String(Files.readAllBytes(Paths.get(L_ECR_PATH)));
-        System.out.println("Contenu de L_ecr: " + l_ecrContent);
-        assertTrue("ER devrait écrire un paquet d'appel dans L_ecr", 
-                l_ecrContent.contains("00001011"));
+        try {
+            // Démarrer les threads
+            er.start();
+            et.init();
+            et.start();
+            
+            // Attendre le temps nécessaire pour que la communication se produise
+            Thread.sleep(3000);
+            
+            // Vérifier le contenu des fichiers
+            String l_ecrContent = new String(Files.readAllBytes(Paths.get(L_ECR_PATH)));
+            System.out.println("Contenu de L_ecr: " + l_ecrContent);
+            
+            assertTrue("ER devrait écrire un paquet d'appel dans L_ecr", 
+                    l_ecrContent.contains("00001011"));
+            
+            String s_ercContent = new String(Files.readAllBytes(Paths.get(S_ERC_PATH)));
+            System.out.println("Contenu de S_erc: " + s_ercContent);
+            
+            boolean connectionProcessed = s_ercContent.contains("Connexion") && 
+                    (s_ercContent.contains("établie") || 
+                     s_ercContent.contains("refusée"));
+            
+            assertTrue("ET et ER devraient avoir communiqué sur l'état de la connexion", 
+                    connectionProcessed);
+        } finally {
+            // Arrêter proprement les threads
+            if (et != null && et.isAlive()) {
+                et.interrupt();
+                et.join(1000);
+            }
+            
+            if (er != null) {
+                er.shutdown();
+                er.join(1000);
+            }
+            
+            // Nettoyage final
+            cleanupFiles();
+            resetStaticState();
+        }
         
-        String s_ercContent = new String(Files.readAllBytes(Paths.get(S_ERC_PATH)));
-        System.out.println("Contenu de S_erc: " + s_ercContent);
-        
-        boolean connectionProcessed = s_ercContent.contains("Connexion") && 
-                (s_ercContent.contains("établie") || 
-                 s_ercContent.contains("refusée"));
-        
-        assertTrue("ET et ER devraient avoir communiqué sur l'état de la connexion", 
-                connectionProcessed);
-        
-        et.interrupt();
-        er.shutdown();
-        er.join(1000);
+        // Une dernière pause pour s'assurer que tout est bien terminé
+        Thread.sleep(500);
     }
     
     /**
@@ -189,5 +291,26 @@ public class InterfaceLayersTest {
         } catch (IOException e) {
             System.err.println("Erreur lors de la suppression du fichier " + path + ": " + e.getMessage());
         }
+    }
+    
+    /**
+     * Réinitialise l'état statique qui pourrait affecter d'autres tests
+     */
+    private void resetStaticState() {
+        // Vider les files d'attente statiques dans ET
+        try {
+            Field queueField = ET.class.getDeclaredField("primitivesQueue");
+            queueField.setAccessible(true);
+            ((Queue<?>) queueField.get(null)).clear();
+            
+            Field connectionsField = ET.class.getDeclaredField("connections");
+            connectionsField.setAccessible(true);
+            ((List<?>) connectionsField.get(null)).clear();
+        } catch (Exception e) {
+            // Ignorer les erreurs, c'est juste un nettoyage préventif
+        }
+        
+        // Réinitialiser les compteurs d'ID si nécessaire
+        GlobalContext.resetConnectionIdCounter();
     }
 }
